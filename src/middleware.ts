@@ -1,25 +1,17 @@
 import type { NextRequest } from "next/server";
 
-import { auth0 } from "./lib/auth0";
+import { auth0Client } from "./lib/auth0-client";
 import { NextResponse } from "next/server";
-
-const protectedRoutes = new Set(["/profile", "/protected", "/admin"]);
+import { runRouteGuards } from "./lib/auth-middleware";
 
 export async function middleware(request: NextRequest) {
-  const authResponse = await auth0.middleware(request);
+  const authResponse = await auth0Client.middleware(request);
 
   if (request.nextUrl.pathname.startsWith("/auth")) {
     return authResponse;
   }
 
-  const session = await auth0.getSession();
-
-  if (protectedRoutes.has(request.nextUrl.pathname) && !session) {
-    const loginURL = new URL("/auth/login", process.env.APP_BASE_URL);
-    loginURL.searchParams.append("returnTo", request.nextUrl.pathname);
-
-    return NextResponse.redirect(loginURL);
-  }
+  runRouteGuards(request);
 
   return NextResponse.next();
 }
