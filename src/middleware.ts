@@ -4,6 +4,8 @@ import { auth0Client } from "./lib/auth0-client";
 import { NextResponse } from "next/server";
 import { runRouteGuards } from "./lib/auth-middleware";
 
+const publicRoutePatterns = [/^\/$/, /^\/((public).*)/];
+
 export async function middleware(request: NextRequest) {
   const authResponse = await auth0Client.middleware(request);
 
@@ -11,7 +13,11 @@ export async function middleware(request: NextRequest) {
     return authResponse;
   }
 
-  runRouteGuards(request);
+  const result = await runRouteGuards(request, publicRoutePatterns);
+
+  if (result) {
+    return NextResponse.redirect(result.redirect.loginUrl);
+  }
 
   return NextResponse.next();
 }

@@ -1,20 +1,52 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { auth0Client } from "./auth0-client";
 
-const protectedRoutes = new Set(["/profile", "/protected", "/admin"]);
+const matchPath = (path: string, patterns: RegExp[]): boolean => {
+  for (const pattern of patterns) {
+    const match = pattern.test(path);
 
-export const runRouteGuards = async (request: NextRequest) => {
+    if (match) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+export const runRouteGuards = async (
+  request: NextRequest,
+  publicRoutePatterns: RegExp[],
+): Promise<{
+  redirect: {
+    loginUrl: URL;
+  };
+} | null> => {
+  const { pathname } = request.nextUrl;
+
   const loginPath = "/auth/login";
   const returnToQueryParamKey = "returnTo";
+
+  const isMatch = matchPath(pathname, publicRoutePatterns);
+
+  if (isMatch) {
+    return null;
+  }
+
   const session = await auth0Client.getSession();
 
-  if (protectedRoutes.has(request.nextUrl.pathname) && !session) {
-    const loginURL = new URL(loginPath, process.env.APP_BASE_URL);
-    loginURL.searchParams.append(
+  if (!session) {
+    const loginUrl = new URL(loginPath, process.env.APP_BASE_URL);
+    loginUrl.searchParams.append(
       returnToQueryParamKey,
       request.nextUrl.pathname,
     );
 
-    return NextResponse.redirect(loginURL);
+    return {
+      redirect: {
+        loginUrl,
+      },
+    };
   }
+
+  return null;
 };
